@@ -1,0 +1,88 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: packnow-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: packnow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - packnow-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: packnow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - packnow-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: packnow-backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/packnow
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=production-secret-key-change-this-very-long-key-min-32-characters
+      - DEBUG=True
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:80
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "
+        python seed_db.py &&
+        uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+    networks:
+      - packnow-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: packnow-frontend
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - packnow-network
+
+networks:
+  packnow-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

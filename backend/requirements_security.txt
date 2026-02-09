@@ -1,0 +1,3 @@
+# Security middleware and configurations
+slowapi==0.1.9
+python-multipart==0.0.6
