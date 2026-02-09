@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-packnow_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-packnow_password}
+      POSTGRES_DB: ${POSTGRES_DB:-packnow}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U packnow_user -d packnow" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-packnow_user}:${POSTGRES_PASSWORD:-packnow_password}@db:5432/${POSTGRES_DB:-packnow}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    expose:
+      - "8000"
+
+  # Frontend (Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - VITE_API_URL=/api/v1
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
