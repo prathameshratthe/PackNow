@@ -35,28 +35,19 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize database
     init_db()
     
-    # Auto-migration for new columns (safe to run multiple times)
-    try:
-        with engine.begin() as conn:
-            # Dropoff and OTP
-            try:
-                conn.execute(text("ALTER TABLE orders ADD COLUMN dropoff_location JSON"))
-            except Exception:
-                pass
-            try:
-                conn.execute(text("ALTER TABLE orders ADD COLUMN delivery_otp VARCHAR(6)"))
-            except Exception:
-                pass
-            try:
-                conn.execute(text("ALTER TABLE orders ADD COLUMN receiver_name VARCHAR"))
-            except Exception:
-                pass
-            try:
-                conn.execute(text("ALTER TABLE orders ADD COLUMN receiver_phone VARCHAR"))
-            except Exception:
-                pass
-    except Exception as e:
-        print(f"Migration error: {e}")
+    # Auto-migration for new columns (PostgreSQL-compatible, safe to run multiple times)
+    migration_queries = [
+        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS dropoff_location JSON",
+        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_otp VARCHAR(6)",
+        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS receiver_name VARCHAR",
+        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS receiver_phone VARCHAR",
+    ]
+    for query in migration_queries:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(query))
+        except Exception as e:
+            print(f"Migration warning for '{query}': {e}")
         
     print("✅ Database initialized and migrated")
     print("✅ Kong-like API Gateway enabled")
