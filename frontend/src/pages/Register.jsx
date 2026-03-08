@@ -133,25 +133,28 @@ export default function Register() {
 
             toast.success('Account created successfully!', 'Welcome to PackNow');
 
-            // Auto login
-            const loginResponse = await api.post('/auth/login/user', {
-                phone: formData.phone,
-                password: formData.password,
-            });
+            // Auto login — wrapped in its own try-catch so failure doesn't cause white screen
+            try {
+                const loginResponse = await api.post('/auth/login/user', {
+                    phone: formData.phone,
+                    password: formData.password,
+                });
 
-            setToken(loginResponse.data.access_token, loginResponse.data.refresh_token);
-            localStorage.setItem('user_role', 'user');
-            console.log('Login successful, redirecting to dashboard');
-
-            // Hard redirect (same as Login.jsx) to avoid white screen on mobile
-            setTimeout(() => {
+                setToken(loginResponse.data.access_token, loginResponse.data.refresh_token);
+                localStorage.setItem('user_role', 'user');
+                console.log('Auto-login successful, redirecting to dashboard');
                 window.location.href = '/dashboard';
-            }, 500);
+                return; // Prevent further execution
+            } catch (loginErr) {
+                console.warn('Auto-login failed after registration, redirecting to login page:', loginErr);
+                toast.success('Account created! Please log in.', 'Registration Successful');
+                window.location.href = '/login';
+                return; // Prevent further execution
+            }
         } catch (err) {
             console.error('Registration error:', err);
             const errorMessage = err.response?.data?.detail || 'Registration failed. Please try again.';
             toast.error(errorMessage, 'Registration Failed');
-        } finally {
             setLoading(false);
         }
     };
