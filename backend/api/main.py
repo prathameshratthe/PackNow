@@ -1,4 +1,4 @@
-"""Main FastAPI application."""
+"""Main FastAPI application with Kong-like API Gateway."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -10,6 +10,15 @@ from core.security_middleware import (
     SecurityHeadersMiddleware,
     RateLimitMiddleware,
     RequestLoggingMiddleware
+)
+from core.api_gateway import (
+    BruteForceProtectionMiddleware,
+    IPBlacklistMiddleware,
+    RequestIDMiddleware,
+    SQLInjectionDetectionMiddleware,
+    BotDetectionMiddleware,
+    RequestSizeLimitMiddleware,
+    APIKeyMiddleware,
 )
 from models.database import init_db
 from api.routes import auth, orders, users, packers, tracking, admin, analytics
@@ -25,8 +34,14 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize database
     init_db()
     print("✅ Database initialized")
-    print("✅ Security middleware enabled")
-    print("✅ Rate limiting: 60 requests/minute per client")
+    print("✅ Kong-like API Gateway enabled")
+    print("✅ Security: Brute force protection (5 attempts → 15-min lockout)")
+    print("✅ Security: IP blacklisting (10 violations → 24-hr ban)")
+    print("✅ Security: SQL injection detection")
+    print("✅ Security: Bot/scanner blocking")
+    print("✅ Security: Request size limit (1MB)")
+    print("✅ Security: Rate limiting (60 req/min)")
+    print("✅ Security: HSTS + CSP + COOP + CORP")
     
     yield
     
@@ -40,39 +55,69 @@ app = FastAPI(
     version=settings.APP_VERSION,
     description="On-demand professional packaging service API with enterprise security",
     lifespan=lifespan,
-    docs_url="/docs" if settings.DEBUG else None,  # Disable docs in production
+    docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
 )
 
-# Security Middleware (order matters - first added = outermost layer)
-# 1. Trusted Host - validate Host header
+
+# ═══════════════════════════════════════════════════════════
+# MIDDLEWARE STACK (order matters — first added = outermost)
+# Kong-like gateway → Security → Rate limit → Logging → CORS
+# ═══════════════════════════════════════════════════════════
+
+# 1. Trusted Hosts
 if not settings.DEBUG:
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["localhost", "127.0.0.1", "*.yourdomain.com"]
+        allowed_hosts=[
+            "localhost", "127.0.0.1",
+            "*.onrender.com",
+            "*.vercel.app",
+        ]
     )
 
 # 2. GZip compression
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# 3. Security Headers
+# 3. Kong Gateway: Request ID tracking
+app.add_middleware(RequestIDMiddleware)
+
+# 4. Kong Gateway: Bot detection
+app.add_middleware(BotDetectionMiddleware)
+
+# 5. Kong Gateway: SQL injection detection
+app.add_middleware(SQLInjectionDetectionMiddleware)
+
+# 6. Kong Gateway: Request body size limit (1MB)
+app.add_middleware(RequestSizeLimitMiddleware, max_size_bytes=1_048_576)
+
+# 7. Kong Gateway: IP blacklisting (auto-ban after 10 rate limit violations)
+app.add_middleware(IPBlacklistMiddleware, ban_threshold=10, ban_duration_hours=24)
+
+# 8. Kong Gateway: Brute force protection (5 attempts → 15-min lockout)
+app.add_middleware(BruteForceProtectionMiddleware, max_attempts=5, lockout_minutes=15)
+
+# 9. Security Headers (HSTS, CSP, COOP, CORP, COEP)
 app.add_middleware(SecurityHeadersMiddleware)
 
-# 4. Rate Limiting
+# 10. Rate Limiting (60 req/min per client)
 app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
 
-# 5. Request Logging
+# 11. Request Logging
 app.add_middleware(RequestLoggingMiddleware)
 
-# 6. CORS (must be last middleware)
+# 12. CORS (must be last middleware added)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["*"],
-    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
-    max_age=600,  # Cache preflight requests for 10 minutes
+    expose_headers=[
+        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
+        "X-Request-ID", "X-Gateway", "X-Login-Attempts-Remaining",
+    ],
+    max_age=600,
 )
 
 # Include routers
@@ -87,11 +132,11 @@ app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 def root():
-    """Root endpoint."""
+    """Root endpoint — no version leakage."""
     return {
-        "message": "Welcome to PackNow API",
-        "version": settings.APP_VERSION,
-        "docs": "/docs"
+        "service": "PackNow API",
+        "status": "operational",
+        "gateway": "PackNow-Gateway/1.0"
     }
 
 
@@ -101,7 +146,6 @@ def health_check():
     return {
         "status": "healthy",
         "service": settings.APP_NAME,
-        "version": settings.APP_VERSION
     }
 
 

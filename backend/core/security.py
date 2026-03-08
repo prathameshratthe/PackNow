@@ -1,6 +1,7 @@
 """Security utilities for authentication and authorization."""
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
+import uuid
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
@@ -60,6 +61,8 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     
     to_encode.update({
         "exp": expire,
+        "iat": datetime.utcnow(),
+        "jti": str(uuid.uuid4()),
         "token_type": TOKEN_TYPE_ACCESS
     })
     
@@ -82,6 +85,8 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     
     to_encode.update({
         "exp": expire,
+        "iat": datetime.utcnow(),
+        "jti": str(uuid.uuid4()),
         "token_type": TOKEN_TYPE_REFRESH
     })
     
@@ -105,10 +110,10 @@ def decode_token(token: str) -> Dict[str, Any]:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
-    except JWTError as e:
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Could not validate credentials: {str(e)}",
+            detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
