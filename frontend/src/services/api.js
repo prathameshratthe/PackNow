@@ -27,9 +27,12 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
+            const role = localStorage.getItem('user_role');
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
-            window.location.href = '/login';
+            localStorage.removeItem('user_role');
+            // Redirect admin to admin login, others to regular login
+            window.location.href = role === 'admin' ? '/admin/login' : '/login';
         }
         return Promise.reject(error);
     }
