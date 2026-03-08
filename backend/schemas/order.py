@@ -29,6 +29,8 @@ class OrderCreate(BaseModel):
     urgency: Optional[UrgencyLevel] = UrgencyLevel.NORMAL
     pickup_location: Location
     dropoff_location: Optional[Location] = None
+    receiver_name: str
+    receiver_phone: str
 
 
 class OrderResponse(BaseModel):
@@ -46,6 +48,8 @@ class OrderResponse(BaseModel):
     distance_km: Optional[float]
     pickup_location: Dict
     dropoff_location: Optional[Dict] = None
+    receiver_name: Optional[str] = None
+    receiver_phone: Optional[str] = None
     delivery_otp: Optional[str] = None
     created_at: datetime
     updated_at: datetime

@@ -29,6 +29,8 @@ export default function CreateOrder() {
         dropoff_address: '',
         dropoff_lat: 19.0820,
         dropoff_lng: 72.8810,
+        receiver_name: '',
+        receiver_phone: '',
     });
     const [estimate, setEstimate] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -95,6 +97,8 @@ export default function CreateOrder() {
                     lng: formData.dropoff_lng,
                     address: formData.dropoff_address,
                 },
+                receiver_name: formData.receiver_name,
+                receiver_phone: formData.receiver_phone,
             };
 
             const response = await api.post('/orders', orderData);
@@ -266,9 +270,39 @@ export default function CreateOrder() {
                             />
                         </div>
 
+                        {/* Receiver Details */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Receiver Name *
+                                </label>
+                                <input
+                                    type="text"
+                                    className="input"
+                                    placeholder="Jane Doe"
+                                    value={formData.receiver_name}
+                                    onChange={(e) => setFormData({ ...formData, receiver_name: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Receiver Phone Number *
+                                </label>
+                                <input
+                                    type="tel"
+                                    className="input"
+                                    placeholder="+919876543210"
+                                    value={formData.receiver_phone}
+                                    onChange={(e) => setFormData({ ...formData, receiver_phone: e.target.value })}
+                                    required
+                                />
+                            </div>
+                        </div>
+
                         <button
                             onClick={handleEstimate}
-                            disabled={loading || !formData.category || !formData.address || !formData.dropoff_address}
+                            disabled={loading || !formData.category || !formData.address || !formData.dropoff_address || !formData.receiver_name || !formData.receiver_phone}
                             className="w-full btn btn-primary py-3"
                         >
                             {loading ? 'Calculating...' : 'Get Estimate'}

@@ -1,5 +1,5 @@
 """Application configuration management."""
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 
@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     
     # Admin Security
     ADMIN_SECRET_KEY: str = "packnow-admin-2026"  # Required as second factor for admin login
+    
+    # Twilio SMS
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_PHONE_NUMBER: Optional[str] = None
     
     # Application
     APP_NAME: str = "PackNow"

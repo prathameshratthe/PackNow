@@ -24,6 +24,7 @@ from services.material_estimator import MaterialEstimator
 from services.pricing_engine import PricingEngine
 from services.dispatcher import Dispatcher
 from services.inventory import InventoryManager
+from services.sms import sms_service
 from core.constants import OrderStatus
 
 
@@ -139,6 +140,8 @@ def create_order(
         price=price_breakdown["final_price"],
         pickup_location=order_data.pickup_location.dict(),
         dropoff_location=order_data.dropoff_location.dict() if order_data.dropoff_location else None,
+        receiver_name=order_data.receiver_name,
+        receiver_phone=order_data.receiver_phone,
         delivery_otp=otp
     )
     
@@ -154,6 +157,11 @@ def create_order(
     )
     db.add(tracking_event)
     db.commit()
+    
+    # Send SMS Confirmation
+    if new_order.receiver_phone:
+        sms_msg = f"Hi {new_order.receiver_name}, an order (ID: #{new_order.id}) has been placed for you on PackNow! We are currently looking for a nearby packer."
+        sms_service.send_sms(new_order.receiver_phone, sms_msg)
     
     # Gig Working Model: Orders wait in the pool to be accepted manually by a packer.
     # background_tasks.add_task(dispatch_packer, new_order.id, db)
@@ -330,6 +338,11 @@ def update_order_status(
     
     db.commit()
     db.refresh(order)
+    
+    # SMS Trigger for Delivery OTP when packer is on the way
+    if status_update.status == OrderStatus.ON_THE_WAY and order.receiver_phone:
+        sms_msg = f"PackNow Alert: Your packer {packer.name if packer else ''} is on the way with your package! Your Delivery OTP is: {order.delivery_otp}. Please share this with the packer at dropoff to complete the delivery."
+        sms_service.send_sms(order.receiver_phone, sms_msg)
     
     return order
 

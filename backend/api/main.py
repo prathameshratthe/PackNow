@@ -47,6 +47,14 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE orders ADD COLUMN delivery_otp VARCHAR(6)"))
             except Exception:
                 pass
+            try:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN receiver_name VARCHAR"))
+            except Exception:
+                pass
+            try:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN receiver_phone VARCHAR"))
+            except Exception:
+                pass
     except Exception as e:
         print(f"Migration error: {e}")
         
