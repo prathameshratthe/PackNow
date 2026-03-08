@@ -7,6 +7,7 @@ from models.database import get_db
 from models.user import User
 from models.order import Order
 from models.packer import Packer
+from models.tracking import TrackingEvent
 from schemas.order import (
     OrderCreate,
     OrderResponse,
@@ -138,6 +139,15 @@ def create_order(
     db.commit()
     db.refresh(new_order)
     
+    # Create initial tracking event
+    tracking_event = TrackingEvent(
+        order_id=new_order.id,
+        status=OrderStatus.CREATED,
+        message="Your order has been placed successfully. Looking for a nearby packer..."
+    )
+    db.add(tracking_event)
+    db.commit()
+    
     # Dispatch packer in background
     background_tasks.add_task(dispatch_packer, new_order.id, db)
     
@@ -184,6 +194,16 @@ def dispatch_packer(order_id: int, db: Session):
         # Deduct inventory
         updated_inventory = Dispatcher.deduct_inventory(packer, order.materials_required)
         InventoryManager.update_packer_inventory(db, packer, updated_inventory)
+        
+        # Create tracking event for packer assignment
+        tracking_event = TrackingEvent(
+            order_id=order.id,
+            status=OrderStatus.PACKER_ASSIGNED,
+            message=f"Packer {packer.name} has been assigned to your order. They are {distance} km away.",
+            packer_lat=packer.lat,
+            packer_lng=packer.lng
+        )
+        db.add(tracking_event)
         
         db.commit()
 
@@ -280,7 +300,27 @@ def update_order_status(
             detail="Not authorized to update this order"
         )
     
+    # Status transition messages
+    status_messages = {
+        OrderStatus.ON_THE_WAY: "Your packer is on the way to your location!",
+        OrderStatus.PACKED: "Your items have been professionally packed and are ready.",
+        OrderStatus.COMPLETED: "Order completed! Thank you for choosing PackNow.",
+        OrderStatus.CANCELLED: "This order has been cancelled.",
+    }
+    
     order.status = status_update.status
+    
+    # Create tracking event
+    packer = db.query(Packer).filter(Packer.id == current_packer.id).first()
+    tracking_event = TrackingEvent(
+        order_id=order.id,
+        status=status_update.status,
+        message=status_messages.get(status_update.status, f"Order status updated to {status_update.status}"),
+        packer_lat=packer.lat if packer else None,
+        packer_lng=packer.lng if packer else None
+    )
+    db.add(tracking_event)
+    
     db.commit()
     db.refresh(order)
     

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { FiPackage, FiClock, FiCheckCircle } from 'react-icons/fi';
+import { FiPackage, FiClock, FiCheckCircle, FiMapPin } from 'react-icons/fi';
 
 const statusColors = {
     CREATED: 'badge-info',
@@ -101,7 +101,16 @@ export default function Dashboard() {
                                         </div>
                                     </div>
 
-                                    <div className="mt-4 md:mt-0 md:ml-6">
+                                    <div className="mt-4 md:mt-0 md:ml-6 flex flex-col gap-2">
+                                        {!['COMPLETED', 'CANCELLED'].includes(order.status) && (
+                                            <Link
+                                                to={`/track/${order.id}`}
+                                                className="btn btn-primary w-full md:w-auto flex items-center justify-center gap-2"
+                                            >
+                                                <FiMapPin className="h-4 w-4" />
+                                                Track
+                                            </Link>
+                                        )}
                                         <Link
                                             to={`/orders/${order.id}`}
                                             className="btn btn-secondary w-full md:w-auto"

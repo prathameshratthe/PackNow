@@ -214,6 +214,42 @@ def login_packer(login_data: UserLogin, db: Session = Depends(get_db)):
     }
 
 
+@router.post("/login/admin", response_model=TokenResponse)
+def login_admin(login_data: UserLogin, db: Session = Depends(get_db)):
+    """
+    Login admin and return JWT tokens.
+    
+    Args:
+        login_data: Login credentials (phone field used as email for admin)
+        db: Database session
+        
+    Returns:
+        Access and refresh tokens
+        
+    Raises:
+        HTTPException: If credentials are invalid
+    """
+    from models.admin import Admin
+    
+    admin = db.query(Admin).filter(Admin.email == login_data.phone).first()
+    
+    if not admin or not verify_password(login_data.password, admin.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    
+    # Create tokens
+    access_token = create_access_token(data={"sub": str(admin.id), "role": UserRole.ADMIN})
+    refresh_token = create_refresh_token(data={"sub": str(admin.id), "role": UserRole.ADMIN})
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
+
 @router.post("/refresh", response_model=TokenResponse)
 def refresh_access_token(refresh_token: str, db: Session = Depends(get_db)):
     """

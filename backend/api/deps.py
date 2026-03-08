@@ -106,3 +106,52 @@ def get_current_packer(
         )
     
     return packer
+
+
+def get_current_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    """
+    Dependency to get current authenticated admin.
+    
+    Args:
+        credentials: HTTP bearer credentials
+        db: Database session
+        
+    Returns:
+        Current admin
+        
+    Raises:
+        HTTPException: If admin not found or token invalid
+    """
+    from models.admin import Admin
+    
+    token = credentials.credentials
+    payload = decode_token(token)
+    verify_token_type(payload, TOKEN_TYPE_ACCESS)
+    
+    admin_id: Optional[int] = int(payload.get("sub")) if payload.get("sub") else None
+    user_role: Optional[str] = payload.get("role")
+    
+    if admin_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+    
+    if user_role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized as admin",
+        )
+    
+    admin = db.query(Admin).filter(Admin.id == admin_id).first()
+    
+    if admin is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Admin not found",
+        )
+    
+    return admin

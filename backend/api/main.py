@@ -12,7 +12,7 @@ from core.security_middleware import (
     RequestLoggingMiddleware
 )
 from models.database import init_db
-from api.routes import auth, orders, users, packers
+from api.routes import auth, orders, users, packers, tracking, admin, analytics
 
 
 @asynccontextmanager
@@ -80,6 +80,9 @@ app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(orders.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(packers.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tracking.router, prefix=settings.API_V1_PREFIX)
+app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
+app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

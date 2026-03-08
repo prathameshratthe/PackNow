@@ -29,6 +29,7 @@ class Order(Base):
     # Relationships
     user = relationship("User", back_populates="orders")
     packer = relationship("Packer", back_populates="orders")
+    tracking_events = relationship("TrackingEvent", back_populates="order", order_by="TrackingEvent.created_at")
     
     def __repr__(self):
         return f"<Order(id={self.id}, status={self.status}, category={self.category})>"

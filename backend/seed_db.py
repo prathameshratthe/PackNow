@@ -5,6 +5,8 @@ from models.user import User
 from models.packer import Packer
 from models.order import Order
 from models.material import Material
+from models.admin import Admin
+from models.tracking import TrackingEvent
 from core.security import hash_password
 from core.constants import MATERIAL_TYPES, MaterialUnit
 
@@ -135,6 +137,27 @@ def seed_packers():
     db.close()
 
 
+def seed_admin():
+    """Seed admins table with default admin."""
+    db = SessionLocal()
+    
+    print("Seeding default admin...")
+    
+    existing = db.query(Admin).filter(Admin.email == "admin@packnow.com").first()
+    
+    if not existing:
+        admin = Admin(
+            name="PackNow Admin",
+            email="admin@packnow.com",
+            password_hash=hash_password("Admin@123")
+        )
+        db.add(admin)
+        db.commit()
+    
+    print("✅ Seeded default admin")
+    db.close()
+
+
 if __name__ == "__main__":
     print("Initializing database...")
     init_db()
@@ -142,9 +165,12 @@ if __name__ == "__main__":
     
     seed_materials()
     seed_packers()
+    seed_admin()
     
     print("\n🎉 Database seeding completed!")
     print("\nDemo packer credentials:")
     print("  Phone: +919876543210, Password: packer123")
     print("  Phone: +919876543211, Password: packer123")
     print("  Phone: +919876543212, Password: packer123")
+    print("\nAdmin credentials:")
+    print("  Email: admin@packnow.com, Password: Admin@123")
