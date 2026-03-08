@@ -104,6 +104,7 @@ export default function PackerDashboard() {
 
     const activeOrders = orders.filter(o => !['COMPLETED', 'CANCELLED'].includes(o.status));
     const completedOrders = orders.filter(o => o.status === 'COMPLETED');
+    const totalEarnings = completedOrders.reduce((sum, order) => sum + Number(order.price), 0);
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -152,6 +153,10 @@ export default function PackerDashboard() {
 
                             <div className="flex items-center gap-6 mt-4 md:mt-0">
                                 <div className="text-center">
+                                    <p className="text-xs text-gray-500">Earnings</p>
+                                    <p className="text-2xl font-bold text-emerald-600">₹{totalEarnings.toFixed(2)}</p>
+                                </div>
+                                <div className="text-center">
                                     <p className="text-xs text-gray-500">Total Orders</p>
                                     <p className="text-2xl font-bold">{orders.length}</p>
                                 </div>
@@ -164,8 +169,8 @@ export default function PackerDashboard() {
                                 <button
                                     onClick={toggleAvailability}
                                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${profile.available
-                                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                         }`}
                                 >
                                     {profile.available ? (
@@ -208,43 +213,94 @@ export default function PackerDashboard() {
                             <p className="text-sm mt-1">Make sure you're online to receive orders!</p>
                         </div>
                     ) : (
-                        <div className="grid gap-4">
+                        <div className="grid gap-6">
                             {activeOrders.map((order) => (
-                                <div key={order.id} className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-emerald-500">
-                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                                        <div>
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <h4 className="font-bold text-lg">Order #{order.id}</h4>
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[order.status]}`}>
-                                                    {order.status.replace(/_/g, ' ')}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm text-gray-500 capitalize mb-1">
-                                                <FiPackage className="inline h-3.5 w-3.5 mr-1" />
-                                                {order.category.replace(/_/g, ' ')} • {order.urgency}
-                                            </p>
-                                            {order.pickup_location && (
-                                                <p className="text-sm text-gray-500">
-                                                    <FiMapPin className="inline h-3.5 w-3.5 mr-1" />
-                                                    {order.pickup_location.address || `${order.pickup_location.lat?.toFixed(4)}, ${order.pickup_location.lng?.toFixed(4)}`}
+                                <div key={order.id} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                                    <div className="p-6 border-l-4 border-emerald-500">
+                                        <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4">
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <h4 className="font-bold text-lg">Order #{order.id}</h4>
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[order.status]}`}>
+                                                        {order.status.replace(/_/g, ' ')}
+                                                    </span>
+                                                    {order.urgency === 'HIGH' && (
+                                                        <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                                                            URGENT
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-gray-500 capitalize mb-1">
+                                                    <FiPackage className="inline h-3.5 w-3.5 mr-1" />
+                                                    {order.category.replace(/_/g, ' ')}
                                                 </p>
-                                            )}
-                                            <p className="text-sm font-semibold mt-2">₹{order.price}</p>
+                                                {order.pickup_location && (
+                                                    <p className="text-sm text-gray-600 font-medium">
+                                                        <FiMapPin className="inline h-4 w-4 mr-1 text-emerald-600" />
+                                                        {order.pickup_location.address || `${order.pickup_location.lat?.toFixed(4)}, ${order.pickup_location.lng?.toFixed(4)}`}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="text-right mt-4 md:mt-0">
+                                                <p className="text-2xl font-bold text-emerald-600">₹{order.price}</p>
+                                                <p className="text-xs text-gray-400">Estimated Payout</p>
+                                            </div>
                                         </div>
 
-                                        {nextStatusMap[order.status] && (
-                                            <button
-                                                onClick={() => updateOrderStatus(order.id, nextStatusMap[order.status])}
-                                                disabled={updatingStatus === order.id}
-                                                className="mt-4 md:mt-0 px-6 py-2.5 text-white rounded-lg text-sm font-semibold transition-all"
-                                                style={{ background: 'linear-gradient(135deg, #059669, #047857)' }}
-                                            >
-                                                {updatingStatus === order.id
-                                                    ? 'Updating...'
-                                                    : nextStatusLabels[order.status]
-                                                }
-                                            </button>
-                                        )}
+                                        {/* Detailed Order Info for Packer */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 bg-gray-50 rounded-lg">
+                                            <div>
+                                                <h5 className="text-xs font-bold text-gray-500 uppercase mb-2">Item Details</h5>
+                                                {order.item_dimensions && (
+                                                    <p className="text-sm text-gray-700">
+                                                        <span className="font-medium">Dimensions:</span> {order.item_dimensions.length}x{order.item_dimensions.width}x{order.item_dimensions.height} cm
+                                                        <br />
+                                                        <span className="font-medium">Weight:</span> {order.item_dimensions.weight} kg
+                                                    </p>
+                                                )}
+                                                {order.fragility_level && (
+                                                    <p className="text-sm text-gray-700 mt-1">
+                                                        <span className="font-medium">Fragility:</span> <span className="capitalize">{order.fragility_level.toLowerCase()}</span>
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <h5 className="text-xs font-bold text-gray-500 uppercase mb-2">Materials Required</h5>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {order.materials_required ? Object.entries(order.materials_required).map(([mat, qty]) => (
+                                                        <span key={mat} className="text-xs px-2 py-1 bg-white border border-gray-200 rounded">
+                                                            {mat.replace(/_/g, ' ')}: <span className="font-bold">{qty}</span>
+                                                        </span>
+                                                    )) : <span className="text-sm text-gray-500">None</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                                            {order.pickup_location?.lat && order.pickup_location?.lng && (
+                                                <a
+                                                    href={`https://www.google.com/maps/dir/?api=1&destination=${order.pickup_location.lat},${order.pickup_location.lng}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="btn flex-1 py-2.5 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 flex items-center justify-center gap-2 rounded-lg font-medium transition-colors"
+                                                >
+                                                    <FiMapPin /> Get Directions
+                                                </a>
+                                            )}
+                                            {nextStatusMap[order.status] && (
+                                                <button
+                                                    onClick={() => updateOrderStatus(order.id, nextStatusMap[order.status])}
+                                                    disabled={updatingStatus === order.id}
+                                                    className="flex-1 px-6 py-2.5 text-white rounded-lg text-sm font-semibold transition-all shadow-sm"
+                                                    style={{ background: 'linear-gradient(135deg, #059669, #047857)' }}
+                                                >
+                                                    {updatingStatus === order.id
+                                                        ? 'Updating...'
+                                                        : nextStatusLabels[order.status]
+                                                    }
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ))}
