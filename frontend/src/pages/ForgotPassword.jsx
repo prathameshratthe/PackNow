@@ -23,11 +23,15 @@ export default function ForgotPassword() {
         if (!phone) { toast.error('Please enter your phone number'); return; }
         setLoading(true);
         try {
-            await api.post('/auth/forgot-password/request-otp', { phone, role });
-            toast.success('OTP sent to your phone number!');
+            const response = await api.post('/auth/forgot-password/request-otp', { phone, role });
+            const generatedOtp = response.data.otp;
+            if (generatedOtp) {
+                setOtp(generatedOtp); // Auto-fill the OTP
+            }
+            toast.success('OTP generated successfully!');
             setStep(2);
         } catch (err) {
-            toast.error(err.response?.data?.detail || 'Failed to send OTP');
+            toast.error(err.response?.data?.detail || 'Failed to generate OTP. Check your phone number.');
         } finally { setLoading(false); }
     };
 
@@ -85,8 +89,8 @@ export default function ForgotPassword() {
                         {[1, 2, 3].map((s) => (
                             <div key={s} className="flex items-center gap-2">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${s < step ? 'bg-green-500 text-white' :
-                                        s === step ? 'bg-primary-600 text-white' :
-                                            'bg-gray-200 text-gray-500'
+                                    s === step ? 'bg-primary-600 text-white' :
+                                        'bg-gray-200 text-gray-500'
                                     }`}>
                                     {s < step ? '✓' : s}
                                 </div>
@@ -117,7 +121,7 @@ export default function ForgotPassword() {
                                         <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
                                         Sending OTP...
                                     </span>
-                                ) : 'Send OTP via SMS'}
+                                ) : 'Generate OTP'}
                             </button>
                         </form>
                     )}
@@ -138,8 +142,14 @@ export default function ForgotPassword() {
                                     autoFocus
                                 />
                                 <p className="mt-2 text-xs text-gray-500 text-center">
-                                    OTP sent to <strong>{phone}</strong>. Expires in 5 minutes.
+                                    Your OTP has been auto-filled below. Expires in 5 minutes.
                                 </p>
+                                {otp && (
+                                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                                        <p className="text-xs text-green-600 font-medium">Your OTP Code</p>
+                                        <p className="text-2xl font-bold text-green-700 tracking-[0.3em] font-mono">{otp}</p>
+                                    </div>
+                                )}
                             </div>
                             <button type="submit" disabled={loading || otp.length !== 6} className="w-full btn btn-primary py-3 text-lg font-semibold">
                                 {loading ? (

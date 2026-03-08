@@ -319,7 +319,7 @@ import string
 import time
 
 from pydantic import BaseModel
-from services.sms import sms_service
+from services.sms import otp_service
 
 # In-memory OTP store: { phone: { "otp": "123456", "expires": timestamp } }
 _password_reset_otps = {}
@@ -368,11 +368,10 @@ def request_password_reset_otp(request: ForgotPasswordRequest, db: Session = Dep
         "verified": False
     }
     
-    # Send SMS
-    sms_msg = f"PackNow Password Reset: Your OTP is {otp}. This code expires in 5 minutes. Do NOT share this with anyone."
-    sms_service.send_sms(request.phone, sms_msg)
+    # Log the OTP (server-side audit trail)
+    otp_service.notify(request.phone, f"Password Reset OTP: {otp}")
     
-    return {"message": "If this phone number is registered, you will receive an OTP."}
+    return {"message": "OTP generated successfully.", "otp": otp}
 
 
 @router.post("/forgot-password/verify-otp")

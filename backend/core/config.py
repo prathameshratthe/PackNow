@@ -29,11 +29,6 @@ class Settings(BaseSettings):
     # Admin Security
     ADMIN_SECRET_KEY: str = "packnow-admin-2026"  # Required as second factor for admin login
     
-    # Twilio SMS
-    TWILIO_ACCOUNT_SID: Optional[str] = None
-    TWILIO_AUTH_TOKEN: Optional[str] = None
-    TWILIO_PHONE_NUMBER: Optional[str] = None
-    
     # Application
     APP_NAME: str = "PackNow"
     APP_VERSION: str = "1.0.0"
