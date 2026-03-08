@@ -33,6 +33,7 @@ export default function CreateOrder() {
         receiver_name: '',
         receiver_phone: '',
     });
+    const [calculatedDistance, setCalculatedDistance] = useState(5); // Default to 5km base
     const [estimate, setEstimate] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -55,11 +56,12 @@ export default function CreateOrder() {
             }
 
             // Calculate exact straight-line distance in km (must be at least 1km to avoid 0 cost)
-            let calculatedDistance = calculateDistance(
+            let distance = calculateDistance(
                 pickupCoords.lat, pickupCoords.lng,
                 dropoffCoords.lat, dropoffCoords.lng
             );
-            calculatedDistance = Math.max(1.0, calculatedDistance); // Minimum 1km distance charge
+            distance = Math.max(1.0, distance); // Minimum 1km distance charge
+            setCalculatedDistance(distance); // Save to state for submission
 
             // Save actual coordinates back to formData so handleSubmit can use them
             setFormData(prev => ({
@@ -80,7 +82,7 @@ export default function CreateOrder() {
                 },
                 fragility_level: formData.fragility_level,
                 urgency: formData.urgency,
-                distance_km: calculatedDistance, // <--- True Dynamic Distance Calculation!
+                distance_km: distance, // <--- True Dynamic Distance Calculation!
             };
 
             const [materialRes, priceRes] = await Promise.all([
@@ -127,6 +129,7 @@ export default function CreateOrder() {
                 },
                 receiver_name: formData.receiver_name,
                 receiver_phone: formData.receiver_phone,
+                distance_km: calculatedDistance, // <--- Send the true calculated distance to backend
             };
 
             const response = await api.post('/orders', orderData);
