@@ -9,7 +9,11 @@ from models.order import Order
 from schemas.packer import PackerResponse, PackerLocationUpdate, PackerAvailabilityUpdate
 from schemas.order import OrderResponse
 from api.deps import get_current_packer
-
+from core.constants import OrderStatus
+from services.dispatcher import Dispatcher
+from services.pricing_engine import PricingEngine
+from services.inventory import InventoryManager
+from models.tracking import TrackingEvent
 
 router = APIRouter(prefix="/packers", tags=["Packers"])
 
@@ -99,6 +103,104 @@ def get_packer_orders(
     ).order_by(Order.created_at.desc()).all()
     
     return orders
+
+
+@router.get("/live-orders", response_model=List[OrderResponse])
+def get_live_orders(
+    current_packer: Packer = Depends(get_current_packer),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all live/unassigned orders nearby (Gig Economy Model).
+    """
+    if not current_packer.available:
+        return []
+
+    # Get all unassigned orders
+    orders = db.query(Order).filter(
+        Order.status == OrderStatus.CREATED
+    ).order_by(Order.created_at.desc()).all()
+    
+    # Filter out orders where packer doesn't have enough inventory
+    valid_orders = []
+    for order in orders:
+        if Dispatcher.check_inventory_sufficient(current_packer.inventory, order.materials_required):
+            # Optional: Calculate distance and only include if within radius
+            valid_orders.append(order)
+            
+    return valid_orders
+
+
+@router.post("/orders/{order_id}/accept", response_model=OrderResponse)
+def accept_order(
+    order_id: int,
+    current_packer: Packer = Depends(get_current_packer),
+    db: Session = Depends(get_db)
+):
+    """
+    Accept an unassigned live order.
+    """
+    if not current_packer.available:
+        raise HTTPException(status_code=400, detail="You must be online to accept orders")
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+        
+    if order.status != OrderStatus.CREATED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This order has already been accepted or cancelled"
+        )
+        
+    # Check inventory
+    if not Dispatcher.check_inventory_sufficient(current_packer.inventory, order.materials_required):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You do not have sufficient inventory to accept this order"
+        )
+        
+    # Calculate distance
+    distance = Dispatcher.haversine_distance(
+        float(current_packer.lat), float(current_packer.lng), 
+        order.pickup_location["lat"], order.pickup_location["lng"]
+    )
+    
+    # Update order with packer and distance
+    order.packer_id = current_packer.id
+    order.distance_km = distance
+    order.status = OrderStatus.PACKER_ASSIGNED
+    
+    # Recalculate price with actual distance
+    price_breakdown = PricingEngine.calculate_price(
+        category=order.category,
+        materials=order.materials_required,
+        distance_km=distance,
+        urgency=order.urgency
+    )
+    order.price = price_breakdown["final_price"]
+    
+    # Deduct inventory
+    updated_inventory = Dispatcher.deduct_inventory(current_packer, order.materials_required)
+    InventoryManager.update_packer_inventory(db, current_packer, updated_inventory)
+    
+    # Create tracking event
+    tracking_event = TrackingEvent(
+        order_id=order.id,
+        status=OrderStatus.PACKER_ASSIGNED,
+        message=f"Packer {current_packer.name} has accepted your order and is {distance} km away.",
+        packer_lat=current_packer.lat,
+        packer_lng=current_packer.lng
+    )
+    db.add(tracking_event)
+    db.commit()
+    db.refresh(order)
+    
+    return order
 
 
 @router.get("/{packer_id}", response_model=PackerResponse)

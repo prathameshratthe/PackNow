@@ -11,8 +11,10 @@ export default function PackerDashboard() {
     const { showToast } = useToast();
     const [profile, setProfile] = useState(null);
     const [orders, setOrders] = useState([]);
+    const [liveOrders, setLiveOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [updatingStatus, setUpdatingStatus] = useState(null);
+    const [acceptingOrder, setAcceptingOrder] = useState(null);
 
     useEffect(() => {
         fetchProfileAndOrders();
@@ -20,12 +22,14 @@ export default function PackerDashboard() {
 
     const fetchProfileAndOrders = async () => {
         try {
-            const [profileRes, ordersRes] = await Promise.all([
+            const [profileRes, ordersRes, liveRes] = await Promise.all([
                 api.get('/packers/me'),
                 api.get('/packers/me/orders'),
+                api.get('/packers/live-orders').catch(() => ({ data: [] }))
             ]);
             setProfile(profileRes.data);
             setOrders(ordersRes.data);
+            setLiveOrders(liveRes.data);
         } catch (error) {
             if (error.response?.status === 401 || error.response?.status === 403) {
                 window.location.href = '/packer/login';
@@ -47,6 +51,21 @@ export default function PackerDashboard() {
             );
         } catch (error) {
             showToast('Failed to update availability', 'error');
+        }
+    };
+
+    const acceptOrder = async (orderId) => {
+        setAcceptingOrder(orderId);
+        try {
+            await api.post(`/packers/orders/${orderId}/accept`);
+            showToast('Order accepted successfully!', 'success');
+            fetchProfileAndOrders();
+        } catch (error) {
+            showToast(error.response?.data?.detail || 'Failed to accept order', 'error');
+            // Refresh feed in case someone else accepted it
+            fetchProfileAndOrders();
+        } finally {
+            setAcceptingOrder(null);
         }
     };
 
@@ -197,6 +216,81 @@ export default function PackerDashboard() {
                                 ))}
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {/* Available Live Orders (Gig Feed) */}
+                {profile?.available && (
+                    <div className="mb-8 border-t-4 border-emerald-500 bg-emerald-50 rounded-xl p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold flex items-center gap-2 text-emerald-900">
+                                <span className="relative flex h-3 w-3 mr-1">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                </span>
+                                Live Requests ({liveOrders.length})
+                            </h3>
+                            <button
+                                onClick={fetchProfileAndOrders}
+                                className="text-xs text-emerald-700 hover:text-emerald-900 font-medium px-3 py-1 bg-emerald-100 rounded-full"
+                            >
+                                Refresh Feed
+                            </button>
+                        </div>
+
+                        {liveOrders.length === 0 ? (
+                            <div className="bg-white/50 rounded-xl border border-emerald-100 p-8 text-center text-emerald-700/70">
+                                <FiPackage className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                                <p>Waiting for new order requests in your area...</p>
+                            </div>
+                        ) : (
+                            <div className="grid gap-4">
+                                {liveOrders.map((order) => (
+                                    <div key={order.id} className="bg-white rounded-xl shadow-lg border border-emerald-100 p-5 transform transition-all hover:-translate-y-1">
+                                        <div className="flex flex-col md:flex-row md:items-start md:justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 uppercase tracking-widest">
+                                                        New Ping
+                                                    </span>
+                                                    {order.urgency === 'HIGH' && (
+                                                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700 uppercase">
+                                                            Urgent
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <h4 className="font-bold text-lg text-gray-900">
+                                                    {order.category.replace(/_/g, ' ')} Packaging
+                                                </h4>
+                                                {order.pickup_location && (
+                                                    <p className="text-sm text-gray-600 mt-1">
+                                                        <FiMapPin className="inline h-4 w-4 mr-1 text-emerald-500" />
+                                                        {order.pickup_location.address || "Pincode: " + Math.round(order.pickup_location.lat * 1000)}
+                                                    </p>
+                                                )}
+                                                <div className="flex gap-4 mt-3 text-xs text-gray-500">
+                                                    <span>Dimensions: {order.item_dimensions.length}x{order.item_dimensions.width}x{order.item_dimensions.height}</span>
+                                                    <span>Weight: {order.item_dimensions.weight}kg</span>
+                                                </div>
+                                            </div>
+                                            <div className="mt-4 md:mt-0 text-left md:text-right flex flex-col justify-between">
+                                                <div>
+                                                    <p className="text-2xl font-black text-emerald-600">₹{order.price}</p>
+                                                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Est. Earnings</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => acceptOrder(order.id)}
+                                                    disabled={acceptingOrder === order.id}
+                                                    className="mt-3 w-full md:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md shadow-emerald-500/30 transition-all disabled:opacity-50"
+                                                >
+                                                    {acceptingOrder === order.id ? 'Accepting...' : 'ACCEPT REQUEST'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 

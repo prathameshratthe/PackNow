@@ -148,8 +148,8 @@ def create_order(
     db.add(tracking_event)
     db.commit()
     
-    # Dispatch packer in background
-    background_tasks.add_task(dispatch_packer, new_order.id, db)
+    # Gig Working Model: Orders wait in the pool to be accepted manually by a packer.
+    # background_tasks.add_task(dispatch_packer, new_order.id, db)
     
     return new_order
 
