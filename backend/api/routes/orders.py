@@ -1,4 +1,6 @@
 """Order management routes."""
+import random
+import string
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
@@ -122,6 +124,9 @@ def create_order(
         urgency=order_data.urgency
     )
     
+    # Generate 6-digit OTP
+    otp = ''.join(random.choices(string.digits, k=6))
+    
     # Create order
     new_order = Order(
         user_id=current_user.id,
@@ -132,7 +137,9 @@ def create_order(
         urgency=order_data.urgency,
         materials_required=materials,
         price=price_breakdown["final_price"],
-        pickup_location=order_data.pickup_location.dict()
+        pickup_location=order_data.pickup_location.dict(),
+        dropoff_location=order_data.dropoff_location.dict() if order_data.dropoff_location else None,
+        delivery_otp=otp
     )
     
     db.add(new_order)
@@ -373,3 +380,65 @@ def cancel_order(
     
     order.status = OrderStatus.CANCELLED
     db.commit()
+
+
+from pydantic import BaseModel
+
+class OTPVerifyRequest(BaseModel):
+    otp: str
+
+@router.post("/{order_id}/verify-otp", response_model=OrderResponse)
+def verify_delivery_otp(
+    order_id: int,
+    request: OTPVerifyRequest,
+    current_packer: Packer = Depends(get_current_packer),
+    db: Session = Depends(get_db)
+):
+    """
+    Verify delivery OTP to complete an order (Gig Economy).
+    """
+    order = db.query(Order).filter(Order.id == order_id).first()
+    
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+    
+    if order.packer_id != current_packer.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to complete this order"
+        )
+        
+    if order.status != OrderStatus.PACKED and order.status != OrderStatus.ON_THE_WAY:
+        # Depending on flow, usually verified at dropoff after packing
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Order is not in a verifiable state"
+        )
+        
+    if order.delivery_otp != request.otp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid OTP"
+        )
+        
+    # Mark as completed
+    order.status = OrderStatus.COMPLETED
+    
+    # Create tracking event
+    packer = db.query(Packer).filter(Packer.id == current_packer.id).first()
+    tracking_event = TrackingEvent(
+        order_id=order.id,
+        status=OrderStatus.COMPLETED,
+        message="Order successfully completed. Dropoff verified via OTP.",
+        packer_lat=packer.lat if packer else None,
+        packer_lng=packer.lng if packer else None
+    )
+    db.add(tracking_event)
+    
+    db.commit()
+    db.refresh(order)
+    
+    return order

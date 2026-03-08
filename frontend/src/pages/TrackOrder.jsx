@@ -155,8 +155,8 @@ export default function TrackOrder() {
                                         {/* Timeline Line */}
                                         <div className="flex flex-col items-center">
                                             <div className={`w-3 h-3 rounded-full mt-1.5 ${index === tracking.events.length - 1
-                                                    ? 'bg-primary-600 ring-4 ring-primary-100'
-                                                    : 'bg-gray-300'
+                                                ? 'bg-primary-600 ring-4 ring-primary-100'
+                                                : 'bg-gray-300'
                                                 }`} />
                                             {index < tracking.events.length - 1 && (
                                                 <div className="w-0.5 h-full bg-gray-200 min-h-[40px]" />
@@ -207,6 +207,13 @@ export default function TrackOrder() {
                                             <p className="font-medium">{tracking.packer_rating?.toFixed(1)} / 5.0</p>
                                         </div>
                                     </div>
+                                    {tracking.delivery_otp && !['COMPLETED', 'CANCELLED'].includes(tracking.current_status) && (
+                                        <div className="mt-4 p-4 border border-dashed border-emerald-300 bg-emerald-50 rounded-lg text-center">
+                                            <p className="text-xs text-emerald-800 font-bold uppercase mb-1">Delivery OTP</p>
+                                            <p className="text-3xl font-black text-emerald-600 tracking-widest">{tracking.delivery_otp}</p>
+                                            <p className="text-xs text-emerald-700 mt-2">Share this with your packer at the final dropoff to complete the delivery.</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ) : (

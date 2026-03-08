@@ -23,6 +23,8 @@ class Order(Base):
     price = Column(DECIMAL(10, 2), nullable=False)
     distance_km = Column(DECIMAL(5, 2), nullable=True)
     pickup_location = Column(JSON, nullable=False)  # {lat, lng, address}
+    dropoff_location = Column(JSON, nullable=True)  # {lat, lng, address} - Added for delivery
+    delivery_otp = Column(String(6), nullable=True) # OTP for secure delivery
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

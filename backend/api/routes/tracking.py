@@ -77,5 +77,6 @@ def get_order_tracking(
         "packer_rating": packer_rating,
         "packer_lat": packer_lat,
         "packer_lng": packer_lng,
+        "delivery_otp": order.delivery_otp,
         "events": events
     }

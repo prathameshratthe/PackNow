@@ -15,6 +15,7 @@ export default function PackerDashboard() {
     const [loading, setLoading] = useState(true);
     const [updatingStatus, setUpdatingStatus] = useState(null);
     const [acceptingOrder, setAcceptingOrder] = useState(null);
+    const [otpInputs, setOtpInputs] = useState({});
 
     useEffect(() => {
         fetchProfileAndOrders();
@@ -77,6 +78,29 @@ export default function PackerDashboard() {
             fetchProfileAndOrders();
         } catch (error) {
             showToast(error.response?.data?.detail || 'Failed to update order', 'error');
+        } finally {
+            setUpdatingStatus(null);
+        }
+    };
+
+    const handleCompleteWithOtp = async (orderId) => {
+        const otp = otpInputs[orderId];
+        if (!otp || otp.length !== 6) {
+            showToast('Please enter a valid 6-digit OTP', 'error');
+            return;
+        }
+        setUpdatingStatus(orderId);
+        try {
+            await api.post(`/orders/${orderId}/verify-otp`, { otp });
+            showToast(`Order #${orderId} completed successfully!`, 'success');
+            setOtpInputs(prev => {
+                const newInputs = { ...prev };
+                delete newInputs[orderId];
+                return newInputs;
+            });
+            fetchProfileAndOrders();
+        } catch (error) {
+            showToast(error.response?.data?.detail || 'Invalid OTP. Ask customer again.', 'error');
         } finally {
             setUpdatingStatus(null);
         }
@@ -263,10 +287,18 @@ export default function PackerDashboard() {
                                                     {order.category.replace(/_/g, ' ')} Packaging
                                                 </h4>
                                                 {order.pickup_location && (
-                                                    <p className="text-sm text-gray-600 mt-1">
+                                                    <div className="text-sm text-gray-600 font-medium mt-1">
                                                         <FiMapPin className="inline h-4 w-4 mr-1 text-emerald-500" />
+                                                        <span className="font-bold">Pickup: </span>
                                                         {order.pickup_location.address || "Pincode: " + Math.round(order.pickup_location.lat * 1000)}
-                                                    </p>
+                                                    </div>
+                                                )}
+                                                {order.dropoff_location && (
+                                                    <div className="text-sm text-gray-600 font-medium mt-1">
+                                                        <FiMapPin className="inline h-4 w-4 mr-1 text-blue-500" />
+                                                        <span className="font-bold">Dropoff: </span>
+                                                        {order.dropoff_location.address || "Pincode: " + Math.round(order.dropoff_location.lat * 1000)}
+                                                    </div>
                                                 )}
                                                 <div className="flex gap-4 mt-3 text-xs text-gray-500">
                                                     <span>Dimensions: {order.item_dimensions.length}x{order.item_dimensions.width}x{order.item_dimensions.height}</span>
@@ -329,10 +361,18 @@ export default function PackerDashboard() {
                                                     {order.category.replace(/_/g, ' ')}
                                                 </p>
                                                 {order.pickup_location && (
-                                                    <p className="text-sm text-gray-600 font-medium">
+                                                    <div className="text-sm text-gray-600 font-medium">
                                                         <FiMapPin className="inline h-4 w-4 mr-1 text-emerald-600" />
-                                                        {order.pickup_location.address || `${order.pickup_location.lat?.toFixed(4)}, ${order.pickup_location.lng?.toFixed(4)}`}
-                                                    </p>
+                                                        <span className="font-bold">Pickup: </span>
+                                                        {order.pickup_location.address || "Location Provided"}
+                                                    </div>
+                                                )}
+                                                {order.dropoff_location && (
+                                                    <div className="text-sm text-gray-600 font-medium mt-1">
+                                                        <FiMapPin className="inline h-4 w-4 mr-1 text-blue-600" />
+                                                        <span className="font-bold">Dropoff: </span>
+                                                        {order.dropoff_location.address || "Location Provided"}
+                                                    </div>
                                                 )}
                                             </div>
                                             <div className="text-right mt-4 md:mt-0">
@@ -371,21 +411,53 @@ export default function PackerDashboard() {
                                         </div>
 
                                         <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                                            {order.pickup_location?.lat && order.pickup_location?.lng && (
-                                                <a
-                                                    href={`https://www.google.com/maps/dir/?api=1&destination=${order.pickup_location.lat},${order.pickup_location.lng}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="btn flex-1 py-2.5 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 flex items-center justify-center gap-2 rounded-lg font-medium transition-colors"
-                                                >
-                                                    <FiMapPin /> Get Directions
-                                                </a>
-                                            )}
-                                            {nextStatusMap[order.status] && (
+                                            <div className="flex gap-2 w-full sm:w-auto">
+                                                {order.pickup_location?.lat && order.pickup_location?.lng && (
+                                                    <a
+                                                        href={`https://www.google.com/maps/dir/?api=1&destination=${order.pickup_location.lat},${order.pickup_location.lng}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="btn flex-1 py-2.5 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 flex items-center justify-center gap-2 rounded-lg font-medium transition-colors text-xs px-2"
+                                                    >
+                                                        <FiMapPin /> Go to Pickup
+                                                    </a>
+                                                )}
+                                                {order.dropoff_location?.lat && order.dropoff_location?.lng && (
+                                                    <a
+                                                        href={`https://www.google.com/maps/dir/?api=1&origin=${order.pickup_location?.lat},${order.pickup_location?.lng}&destination=${order.dropoff_location.lat},${order.dropoff_location.lng}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="btn flex-1 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 flex items-center justify-center gap-2 rounded-lg font-medium transition-colors text-xs px-2"
+                                                    >
+                                                        <FiMapPin /> Go to Dropoff
+                                                    </a>
+                                                )}
+                                            </div>
+
+                                            {nextStatusMap[order.status] === 'COMPLETED' ? (
+                                                <div className="flex-1 flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Enter 6-digit Delivery OTP"
+                                                        maxLength={6}
+                                                        value={otpInputs[order.id] || ''}
+                                                        onChange={(e) => setOtpInputs({ ...otpInputs, [order.id]: e.target.value.replace(/\D/g, '') })}
+                                                        className="flex-1 input text-center text-lg font-bold tracking-widest border-emerald-300 focus:ring-emerald-500 rounded-lg py-2 h-full"
+                                                    />
+                                                    <button
+                                                        onClick={() => handleCompleteWithOtp(order.id)}
+                                                        disabled={updatingStatus === order.id || (otpInputs[order.id] || '').length !== 6}
+                                                        className="px-6 text-white rounded-lg text-sm font-semibold transition-all shadow-sm disabled:opacity-50"
+                                                        style={{ background: 'linear-gradient(135deg, #059669, #047857)' }}
+                                                    >
+                                                        {updatingStatus === order.id ? 'Checking...' : 'Complete Delivery'}
+                                                    </button>
+                                                </div>
+                                            ) : nextStatusMap[order.status] ? (
                                                 <button
                                                     onClick={() => updateOrderStatus(order.id, nextStatusMap[order.status])}
                                                     disabled={updatingStatus === order.id}
-                                                    className="flex-1 px-6 py-2.5 text-white rounded-lg text-sm font-semibold transition-all shadow-sm"
+                                                    className="flex-1 w-full sm:w-auto px-6 py-2.5 text-white rounded-lg text-sm font-semibold transition-all shadow-sm mt-2 sm:mt-0"
                                                     style={{ background: 'linear-gradient(135deg, #059669, #047857)' }}
                                                 >
                                                     {updatingStatus === order.id
@@ -393,7 +465,7 @@ export default function PackerDashboard() {
                                                         : nextStatusLabels[order.status]
                                                     }
                                                 </button>
-                                            )}
+                                            ) : null}
                                         </div>
                                     </div>
                                 </div>

@@ -27,4 +27,5 @@ class TrackingTimelineResponse(BaseModel):
     packer_rating: Optional[float] = None
     packer_lat: Optional[float] = None
     packer_lng: Optional[float] = None
+    delivery_otp: Optional[str] = None
     events: List[TrackingEventResponse]

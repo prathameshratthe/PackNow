@@ -26,6 +26,9 @@ export default function CreateOrder() {
         address: '',
         lat: 19.0760,
         lng: 72.8777,
+        dropoff_address: '',
+        dropoff_lat: 19.0820,
+        dropoff_lng: 72.8810,
     });
     const [estimate, setEstimate] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -87,6 +90,11 @@ export default function CreateOrder() {
                     lng: formData.lng,
                     address: formData.address,
                 },
+                dropoff_location: {
+                    lat: formData.dropoff_lat,
+                    lng: formData.dropoff_lng,
+                    address: formData.dropoff_address,
+                },
             };
 
             const response = await api.post('/orders', orderData);
@@ -124,8 +132,8 @@ export default function CreateOrder() {
                                         key={cat.value}
                                         onClick={() => setFormData({ ...formData, category: cat.value })}
                                         className={`p-4 rounded-lg border-2 transition-all ${formData.category === cat.value
-                                                ? 'border-primary-600 bg-primary-50'
-                                                : 'border-gray-300 hover:border-primary-400'
+                                            ? 'border-primary-600 bg-primary-50'
+                                            : 'border-gray-300 hover:border-primary-400'
                                             }`}
                                     >
                                         <div className="text-3xl mb-2">{cat.icon}</div>
@@ -243,9 +251,24 @@ export default function CreateOrder() {
                             />
                         </div>
 
+                        {/* Dropoff Address */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Dropoff Address / Final Destination *
+                            </label>
+                            <textarea
+                                className="input"
+                                rows="3"
+                                placeholder="Enter destination address where items will be delivered or shipped"
+                                value={formData.dropoff_address}
+                                onChange={(e) => setFormData({ ...formData, dropoff_address: e.target.value })}
+                                required
+                            />
+                        </div>
+
                         <button
                             onClick={handleEstimate}
-                            disabled={loading || !formData.category || !formData.address}
+                            disabled={loading || !formData.category || !formData.address || !formData.dropoff_address}
                             className="w-full btn btn-primary py-3"
                         >
                             {loading ? 'Calculating...' : 'Get Estimate'}

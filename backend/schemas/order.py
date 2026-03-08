@@ -28,6 +28,7 @@ class OrderCreate(BaseModel):
     fragility_level: Optional[FragilityLevel] = FragilityLevel.LOW
     urgency: Optional[UrgencyLevel] = UrgencyLevel.NORMAL
     pickup_location: Location
+    dropoff_location: Optional[Location] = None
 
 
 class OrderResponse(BaseModel):
@@ -44,6 +45,8 @@ class OrderResponse(BaseModel):
     price: float
     distance_km: Optional[float]
     pickup_location: Dict
+    dropoff_location: Optional[Dict] = None
+    delivery_otp: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     

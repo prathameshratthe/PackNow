@@ -20,7 +20,8 @@ from core.api_gateway import (
     RequestSizeLimitMiddleware,
     APIKeyMiddleware,
 )
-from models.database import init_db
+from sqlalchemy import text
+from models.database import init_db, engine
 from api.routes import auth, orders, users, packers, tracking, admin, analytics
 
 
@@ -33,7 +34,23 @@ async def lifespan(app: FastAPI):
     """
     # Startup: Initialize database
     init_db()
-    print("✅ Database initialized")
+    
+    # Auto-migration for new columns (safe to run multiple times)
+    try:
+        with engine.begin() as conn:
+            # Dropoff and OTP
+            try:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN dropoff_location JSON"))
+            except Exception:
+                pass
+            try:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN delivery_otp VARCHAR(6)"))
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"Migration error: {e}")
+        
+    print("✅ Database initialized and migrated")
     print("✅ Kong-like API Gateway enabled")
     print("✅ Security: Brute force protection (5 attempts → 15-min lockout)")
     print("✅ Security: IP blacklisting (10 violations → 24-hr ban)")
