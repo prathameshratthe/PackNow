@@ -25,11 +25,10 @@ export default function AdminLogin() {
             localStorage.setItem('refresh_token', response.data.refresh_token);
             localStorage.setItem('user_role', 'admin');
 
-            showToast('Welcome, Admin!', 'success');
-            navigate('/admin/dashboard');
+            // Hard redirect to admin dashboard (more reliable than navigate for auth changes)
+            window.location.href = '/admin/dashboard';
         } catch (error) {
             showToast(error.response?.data?.detail || 'Invalid credentials', 'error');
-        } finally {
             setLoading(false);
         }
     };
