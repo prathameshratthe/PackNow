@@ -140,11 +140,12 @@ export default function Register() {
             });
 
             setToken(loginResponse.data.access_token, loginResponse.data.refresh_token);
+            localStorage.setItem('user_role', 'user');
             console.log('Login successful, redirecting to dashboard');
 
-            // Small delay for user to see success message
+            // Hard redirect (same as Login.jsx) to avoid white screen on mobile
             setTimeout(() => {
-                navigate('/dashboard');
+                window.location.href = '/dashboard';
             }, 500);
         } catch (err) {
             console.error('Registration error:', err);
