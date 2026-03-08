@@ -1,208 +1,127 @@
 # PackNow - On-Demand Professional Packaging Service
 
-> A full-stack web application connecting users with professional packers for secure packaging and shipping services.
+> A comprehensive full-stack platform connecting users with professional packers for secure, on-demand packaging services at their doorstep.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
-[![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
-[![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)
+![React 18](https://img.shields.io/badge/React-18-blue.svg)
 
-## 🚀 Features
+## 🌟 Overview
 
-- **User Authentication** - Secure JWT-based authentication with password strength validation
-- **Role-Based Access** - Separate portals for users and packers
-- **Order Management** - Create, track, and manage packaging orders
-- **Real-Time Pricing** - Dynamic pricing based on category, distance, and materials
-- **Geolocation** - Automatic location detection for service availability
-- **Security** - Rate limiting, CORS, security headers, OWASP compliance
-- **Modern UI** - Responsive design with Toast notifications and animations
+PackNow is a solution designed to simplify the process of packaging items securely. Whether it's a fragile gift, important documents, or electronics, users can request a professional "Packer" to arrive at their location, equipped with the exact materials needed to safely pack their items for shipping. 
+
+The architecture is built heavily around **three distinct, isolated roles** with their own dashboards, ensuring data security and role-specific workflows.
+
+---
+
+## 👥 Three Isolated Roles
+
+PackNow features three completely separated interfaces, preventing cross-role access and ensuring a streamlined experience for each user type.
+
+### 1. 👤 The Customer (User)
+* **URL:** `/dashboard`
+* **Theme:** Light mode, user-friendly aesthetic.
+* **Capabilities:** 
+  * Register and authenticate via Email OTP.
+  * Estimate order prices instantly using real-world map coordinates (Pickup to Dropoff).
+  * Request a Packer by selecting the item category, dimensions, and urgency.
+  * View tracking history and real-time order status updates.
+  * Provide a secure **Delivery OTP** to the Packer to confirm the service is completed.
+
+### 2. 🧰 The Professional (Packer)
+* **URL:** `/packer/dashboard`
+* **Theme:** Warm, action-oriented aesthetic.
+* **Capabilities:** 
+  * Manage real-time inventory of packaging materials (Bubble wrap, boxes, tape, etc.).
+  * Go "Online" to receive nearby packing requests.
+  * Accept orders based on required materials and distance.
+  * Update order tracking statuses (En Route, Arrived, Packing, Completed).
+  * Complete orders by verifying the Customer's Delivery OTP.
+
+### 3. 🛡️ The Administrator (Admin)
+* **URL:** `/admin/login`
+* **Theme:** Strict, data-heavy dashboard.
+* **Authentication:** Hardcoded, ultra-secure admin secret key (`ADMIN_SECRET_KEY`). Total isolation from the regular JWT user pool.
+* **Capabilities:** 
+  * View global system metrics (Total Revenue, Active Users, Pending Orders).
+  * Manage all user and packer accounts (Suspend, Delete, View).
+  * Oversee all orders from a high level.
+  * Monitor system health.
+
+---
+
+## 🚀 Key Technical Features
+
+- **Free, Reliable Authentication (Email OTP):** Migrated from paid SMS (Twilio) to a 100% free **Email OTP** system using the Resend Python SDK, ensuring high deliverability without recurring API costs.
+- **Fair & Real-time Dynamic Pricing:** Integrated **OpenStreetMap (Nominatim API)** on the frontend to geocode raw text addresses into real latitude/longitude coordinates. Prices are dynamically and deterministically calculated based on the precise straight-line distance from the *Pickup* to the *Dropoff* location, item dimensions, fragility, and urgency.
+- **Intelligent Dispatch System:** The backend dispatcher calculates distances using the Haversine formula and only matches orders to Packers who are within the search radius AND have sufficient material inventory to complete the job.
+- **Robust Security:** Implemented role-based JWT authentication, password hashing (bcrypt), and strict endpoint isolation.
+
+---
 
 ## 🛠️ Tech Stack
 
 ### Backend
-- **FastAPI** - Modern Python web framework
-- **PostgreSQL** - Relational database
-- **Redis** - Caching and session management
-- **SQLAlchemy** - ORM for database operations
-- **JWT** - Secure authentication
-- **Docker** - Containerization
+- **FastAPI** - High-performance Python async web framework.
+- **PostgreSQL** - Primary relational database.
+- **SQLAlchemy** - ORM for secure database operations.
+- **Resend SDK** - For reliable Email OTP delivery.
 
 ### Frontend
-- **React 18** - UI library
-- **React Router** - Navigation
-- **Axios** - HTTP client
-- **Tailwind CSS** - Utility-first styling
-- **Vite** - Build tool
+- **React 18** - Modern UI library.
+- **Tailwind CSS** - Utility-first styling for rapid UI development.
+- **Vite** - Lightning-fast build tool.
+- **Axios** - Intercepted HTTP client for JWT management.
 
-## 📋 Prerequisites
+---
 
-- Docker & Docker Compose
-- Git
-- (Optional) Node.js 18+ and Python 3.11+ for local development
+## 📋 Local Setup & Development
 
-## 🚀 Quick Start
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- PostgreSQL database
 
-### Using Docker (Recommended)
-
-```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/PackNow.git
-cd PackNow
-
-# Create environment file
-cp backend/.env.example backend/.env
-
-# Start all services
-docker compose up -d
-
-# View logs
-docker compose logs -f
+### Environment Variables
+**Backend (`backend/.env`):**
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/packnow
+SECRET_KEY=your_super_secret_jwt_key
+ADMIN_SECRET_KEY=your_secure_admin_password
+RESEND_API_KEY=re_your_resend_api_key
 ```
 
-**Access the application:**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+**Frontend (`frontend/.env`):**
+```env
+VITE_API_URL=http://localhost:8000/api/v1
+```
 
-### Local Development
+### Running Locally
 
-**Backend:**
+**1. Start the Backend:**
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn api.main:app --reload
 ```
 
-**Frontend:**
+**2. Start the Frontend:**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-## 🔐 Demo Credentials
-
-**Packer Account:**
-- Phone: +919876543210
-- Password: packer123
-
-**User Account:**
-- Register a new account at http://localhost:3000/register
-
-## 📁 Project Structure
-
-```
-PackNow/
-├── backend/
-│   ├── api/           # API routes and dependencies
-│   ├── core/          # Configuration and security
-│   ├── models/        # Database models
-│   ├── schemas/       # Pydantic schemas
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── components/  # Reusable components
-│   │   ├── pages/       # Page components
-│   │   ├── services/    # API services
-│   │   └── utils/       # Utility functions
-│   └── package.json
-├── docker-compose.yml
-└── README.md
-```
-
-## 🌐 Deployment
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions on:
-- Render (Free tier)
-- Railway (Free tier)
-- Vercel (Frontend)
-- Netlify (Frontend)
-
-## 🔒 Security Features
-
-- ✅ JWT authentication with refresh tokens
-- ✅ Password strength validation (8+ chars, mixed case, digit, special char)
-- ✅ Rate limiting (60 req/min per client)
-- ✅ CORS protection
-- ✅ Security headers (XSS, clickjacking, MIME sniffing protection)
-- ✅ Input validation and sanitization
-- ✅ SQL injection prevention (ORM)
-- ✅ OWASP Top 10 compliance
-
-See [SECURITY.md](./SECURITY.md) for complete security documentation.
-
-## 📚 API Documentation
-
-Once running, visit http://localhost:8000/docs for interactive API documentation (Swagger UI).
-
-### Key Endpoints
-
-- `POST /api/v1/auth/register/user` - User registration
-- `POST /api/v1/auth/login/user` - User login
-- `POST /api/v1/auth/refresh` - Refresh access token
-- `GET /api/v1/orders` - List user orders
-- `POST /api/v1/orders` - Create new order
-- `GET /api/v1/orders/{id}` - Get order details
-
-## 🧪 Testing
-
-**Backend:**
-```bash
-# Test registration
-curl -X POST http://localhost:8000/api/v1/auth/register/user \
-  -H "Content-Type: application/json" \
-  -d @test_register.json
-
-# Test login
-curl -X POST http://localhost:8000/api/v1/auth/login/user \
-  -H "Content-Type: application/json" \
-  -d @test_login.json
-```
-
-**Frontend:**
-1. Navigate to http://localhost:3000
-2. Create account with strong password
-3. Test order creation flow
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👥 Authors
-
-- **Your Name** - *Initial work*
-
-## 🙏 Acknowledgments
-
-- FastAPI documentation
-- React documentation
-- Tailwind CSS
-- Docker
-
-## 📞 Support
-
-For support, email support@packnow.com or open an issue in the repository.
-
-## 🗺️ Roadmap
-
-- [ ] Real-time order tracking
-- [ ] Payment integration (Stripe/Razorpay)
-- [ ] SMS notifications
-- [ ] Mobile app (React Native)
-- [ ] Admin dashboard
-- [ ] Analytics and reporting
-- [ ] Multi-language support
-
 ---
 
+## 🌐 Live Deployment
+* **Frontend:** Hosted on Vercel
+* **Backend:** Hosted on Render (Web Service)
+* **Database:** Managed PostgreSQL on Render
+
+*(For detailed deployment instructions, refer to `DEPLOYMENT.md` or `walkthrough.md`)*
+
+---
 **Made with ❤️ for VII semester project**
