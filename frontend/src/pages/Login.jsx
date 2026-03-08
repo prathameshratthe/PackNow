@@ -64,12 +64,8 @@ export default function Login() {
 
             if (response.data.access_token) {
                 setToken(response.data.access_token, response.data.refresh_token);
-                console.log('Tokens saved, navigating to dashboard');
-                toast.success('Welcome back!', 'Login Successful');
-
-                setTimeout(() => {
-                    navigate('/dashboard');
-                }, 300);
+                localStorage.setItem('user_role', 'user');
+                window.location.href = '/dashboard';
             } else {
                 toast.error('No access token received', 'Login Failed');
             }
@@ -209,14 +205,7 @@ export default function Login() {
                         </p>
                     </div>
 
-                    {/* Demo Credentials */}
-                    <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-sm text-blue-800 font-medium mb-2">Demo Packer Credentials:</p>
-                        <div className="text-xs text-blue-700 space-y-1">
-                            <p>Phone: +919876543210</p>
-                            <p>Password: packer123</p>
-                        </div>
-                    </div>
+
                 </div>
             </div>
         </div>

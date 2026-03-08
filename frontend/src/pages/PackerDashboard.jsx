@@ -1,0 +1,293 @@
+// Packer Dashboard — Separate interface for service providers
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
+import { useToast } from '../components/Toast';
+import {
+    FiTruck, FiPackage, FiMapPin, FiToggleLeft, FiToggleRight,
+    FiLogOut, FiClock, FiCheckCircle, FiUser, FiPhone
+} from 'react-icons/fi';
+
+export default function PackerDashboard() {
+    const { showToast } = useToast();
+    const [profile, setProfile] = useState(null);
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [updatingStatus, setUpdatingStatus] = useState(null);
+
+    useEffect(() => {
+        fetchProfileAndOrders();
+    }, []);
+
+    const fetchProfileAndOrders = async () => {
+        try {
+            const [profileRes, ordersRes] = await Promise.all([
+                api.get('/packers/me'),
+                api.get('/packers/me/orders'),
+            ]);
+            setProfile(profileRes.data);
+            setOrders(ordersRes.data);
+        } catch (error) {
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                window.location.href = '/packer/login';
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleAvailability = async () => {
+        try {
+            const res = await api.patch('/packers/me/availability', {
+                available: !profile.available,
+            });
+            setProfile(res.data);
+            showToast(
+                res.data.available ? 'You are now available for orders!' : 'You are now offline.',
+                res.data.available ? 'success' : 'info'
+            );
+        } catch (error) {
+            showToast('Failed to update availability', 'error');
+        }
+    };
+
+    const updateOrderStatus = async (orderId, newStatus) => {
+        setUpdatingStatus(orderId);
+        try {
+            await api.patch(`/orders/${orderId}/status`, { status: newStatus });
+            showToast(`Order #${orderId} updated to ${newStatus.replace(/_/g, ' ')}`, 'success');
+            fetchProfileAndOrders();
+        } catch (error) {
+            showToast(error.response?.data?.detail || 'Failed to update order', 'error');
+        } finally {
+            setUpdatingStatus(null);
+        }
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user_role');
+        window.location.href = '/packer/login';
+    };
+
+    const statusColors = {
+        CREATED: 'bg-blue-100 text-blue-700',
+        PACKER_ASSIGNED: 'bg-yellow-100 text-yellow-700',
+        ON_THE_WAY: 'bg-orange-100 text-orange-700',
+        PACKED: 'bg-green-100 text-green-700',
+        COMPLETED: 'bg-emerald-100 text-emerald-700',
+        CANCELLED: 'bg-red-100 text-red-700',
+    };
+
+    const nextStatusMap = {
+        PACKER_ASSIGNED: 'ON_THE_WAY',
+        ON_THE_WAY: 'PACKED',
+        PACKED: 'COMPLETED',
+    };
+
+    const nextStatusLabels = {
+        PACKER_ASSIGNED: 'Start Journey',
+        ON_THE_WAY: 'Mark as Packed',
+        PACKED: 'Complete Order',
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4" />
+                    <p className="text-gray-600">Loading packer dashboard...</p>
+                </div>
+            </div>
+        );
+    }
+
+    const activeOrders = orders.filter(o => !['COMPLETED', 'CANCELLED'].includes(o.status));
+    const completedOrders = orders.filter(o => o.status === 'COMPLETED');
+
+    return (
+        <div className="min-h-screen bg-gray-50">
+            {/* Packer Header — Green theme */}
+            <div className="bg-gradient-to-r from-emerald-800 to-emerald-900 text-white">
+                <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <FiTruck className="h-6 w-6 text-emerald-300" />
+                        <h1 className="text-xl font-bold">PackNow Packer</h1>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        {profile && (
+                            <span className="text-emerald-200 text-sm hidden sm:block">
+                                {profile.name}
+                            </span>
+                        )}
+                        <button onClick={handleLogout} className="flex items-center gap-2 text-emerald-200 hover:text-white transition-colors">
+                            <FiLogOut className="h-5 w-5" />
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                {/* Profile & Availability */}
+                {profile && (
+                    <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${profile.available ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                                    }`}>
+                                    <FiUser className="h-7 w-7" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold">{profile.name}</h2>
+                                    <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+                                        <span className="flex items-center gap-1">
+                                            <FiPhone className="h-3.5 w-3.5" />
+                                            {profile.phone}
+                                        </span>
+                                        <span className="text-yellow-600">★ {profile.rating.toFixed(1)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-6 mt-4 md:mt-0">
+                                <div className="text-center">
+                                    <p className="text-xs text-gray-500">Total Orders</p>
+                                    <p className="text-2xl font-bold">{orders.length}</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-xs text-gray-500">Completed</p>
+                                    <p className="text-2xl font-bold text-emerald-600">{completedOrders.length}</p>
+                                </div>
+
+                                {/* Availability Toggle */}
+                                <button
+                                    onClick={toggleAvailability}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${profile.available
+                                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    {profile.available ? (
+                                        <><FiToggleRight className="h-5 w-5" /> Online</>
+                                    ) : (
+                                        <><FiToggleLeft className="h-5 w-5" /> Offline</>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Inventory Section */}
+                        <div className="mt-6 pt-4 border-t border-gray-100">
+                            <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">My Inventory</p>
+                            <div className="flex flex-wrap gap-2">
+                                {Object.entries(profile.inventory).map(([item, qty]) => (
+                                    <span
+                                        key={item}
+                                        className={`text-xs px-3 py-1.5 rounded-full font-medium ${qty < 10 ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-gray-100 text-gray-600'
+                                            }`}
+                                    >
+                                        {item.replace(/_/g, ' ')}: {qty}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Active Orders */}
+                <div className="mb-8">
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <FiClock className="text-orange-500" />
+                        Active Orders ({activeOrders.length})
+                    </h3>
+                    {activeOrders.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm p-12 text-center text-gray-400">
+                            <FiPackage className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                            <p>No active orders right now</p>
+                            <p className="text-sm mt-1">Make sure you're online to receive orders!</p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-4">
+                            {activeOrders.map((order) => (
+                                <div key={order.id} className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-emerald-500">
+                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <h4 className="font-bold text-lg">Order #{order.id}</h4>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[order.status]}`}>
+                                                    {order.status.replace(/_/g, ' ')}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-gray-500 capitalize mb-1">
+                                                <FiPackage className="inline h-3.5 w-3.5 mr-1" />
+                                                {order.category.replace(/_/g, ' ')} • {order.urgency}
+                                            </p>
+                                            {order.pickup_location && (
+                                                <p className="text-sm text-gray-500">
+                                                    <FiMapPin className="inline h-3.5 w-3.5 mr-1" />
+                                                    {order.pickup_location.address || `${order.pickup_location.lat?.toFixed(4)}, ${order.pickup_location.lng?.toFixed(4)}`}
+                                                </p>
+                                            )}
+                                            <p className="text-sm font-semibold mt-2">₹{order.price}</p>
+                                        </div>
+
+                                        {nextStatusMap[order.status] && (
+                                            <button
+                                                onClick={() => updateOrderStatus(order.id, nextStatusMap[order.status])}
+                                                disabled={updatingStatus === order.id}
+                                                className="mt-4 md:mt-0 px-6 py-2.5 text-white rounded-lg text-sm font-semibold transition-all"
+                                                style={{ background: 'linear-gradient(135deg, #059669, #047857)' }}
+                                            >
+                                                {updatingStatus === order.id
+                                                    ? 'Updating...'
+                                                    : nextStatusLabels[order.status]
+                                                }
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Completed Orders */}
+                <div>
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <FiCheckCircle className="text-emerald-500" />
+                        Completed Orders ({completedOrders.length})
+                    </h3>
+                    {completedOrders.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-400">
+                            No completed orders yet
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ID</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Category</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Price</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {completedOrders.map((order) => (
+                                        <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4 font-medium">#{order.id}</td>
+                                            <td className="px-6 py-4 capitalize">{order.category.replace(/_/g, ' ')}</td>
+                                            <td className="px-6 py-4 font-medium text-emerald-600">₹{order.price}</td>
+                                            <td className="px-6 py-4 text-gray-500 text-sm">{new Date(order.created_at).toLocaleDateString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
