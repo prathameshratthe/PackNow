@@ -83,6 +83,12 @@ export default function PackerLogin() {
                         >
                             {loading ? 'Signing in...' : 'Sign In to Packer Portal'}
                         </button>
+
+                        <div className="text-center mt-2">
+                            <a href="/forgot-password?role=packer" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+                                Forgot password?
+                            </a>
+                        </div>
                     </form>
                 </div>
 

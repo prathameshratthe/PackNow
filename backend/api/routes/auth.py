@@ -308,3 +308,154 @@ def refresh_access_token(refresh_token: str, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token"
         )
+
+
+# ═══════════════════════════════════════════════════════════
+# FORGOT PASSWORD — SMS OTP Flow
+# ═══════════════════════════════════════════════════════════
+
+import random
+import string
+import time
+
+from pydantic import BaseModel
+from services.sms import sms_service
+
+# In-memory OTP store: { phone: { "otp": "123456", "expires": timestamp } }
+_password_reset_otps = {}
+
+
+class ForgotPasswordRequest(BaseModel):
+    phone: str
+    role: str = "user"  # "user" or "packer"
+
+
+class VerifyOTPRequest(BaseModel):
+    phone: str
+    otp: str
+    role: str = "user"
+
+
+class ResetPasswordRequest(BaseModel):
+    phone: str
+    otp: str
+    new_password: str
+    role: str = "user"
+
+
+@router.post("/forgot-password/request-otp")
+def request_password_reset_otp(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Send a 6-digit OTP via SMS for password reset."""
+    
+    # Find the user/packer
+    if request.role == "packer":
+        account = db.query(Packer).filter(Packer.phone == request.phone).first()
+    else:
+        account = db.query(User).filter(User.phone == request.phone).first()
+    
+    if not account:
+        # Don't reveal whether the phone exists — always return success
+        return {"message": "If this phone number is registered, you will receive an OTP."}
+    
+    # Generate 6-digit OTP
+    otp = ''.join(random.choices(string.digits, k=6))
+    
+    # Store with 5-minute expiry
+    _password_reset_otps[request.phone] = {
+        "otp": otp,
+        "expires": time.time() + 300,  # 5 minutes
+        "role": request.role,
+        "verified": False
+    }
+    
+    # Send SMS
+    sms_msg = f"PackNow Password Reset: Your OTP is {otp}. This code expires in 5 minutes. Do NOT share this with anyone."
+    sms_service.send_sms(request.phone, sms_msg)
+    
+    return {"message": "If this phone number is registered, you will receive an OTP."}
+
+
+@router.post("/forgot-password/verify-otp")
+def verify_password_reset_otp(request: VerifyOTPRequest):
+    """Verify the OTP sent for password reset."""
+    
+    stored = _password_reset_otps.get(request.phone)
+    
+    if not stored:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No OTP found for this number. Please request a new one."
+        )
+    
+    if time.time() > stored["expires"]:
+        del _password_reset_otps[request.phone]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OTP has expired. Please request a new one."
+        )
+    
+    if stored["otp"] != request.otp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid OTP. Please try again."
+        )
+    
+    # Mark as verified
+    _password_reset_otps[request.phone]["verified"] = True
+    
+    return {"message": "OTP verified successfully. You can now reset your password."}
+
+
+@router.post("/forgot-password/reset-password")
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset password after successful OTP verification."""
+    
+    stored = _password_reset_otps.get(request.phone)
+    
+    if not stored or not stored.get("verified"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please verify your OTP first."
+        )
+    
+    if time.time() > stored["expires"]:
+        del _password_reset_otps[request.phone]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OTP has expired. Please request a new one."
+        )
+    
+    if stored["otp"] != request.otp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid OTP."
+        )
+    
+    # Validate new password strength
+    from core.security_middleware import validate_password_strength
+    is_valid, error_msg = validate_password_strength(request.new_password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg
+        )
+    
+    # Find account and update password
+    if request.role == "packer":
+        account = db.query(Packer).filter(Packer.phone == request.phone).first()
+    else:
+        account = db.query(User).filter(User.phone == request.phone).first()
+    
+    if not account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found."
+        )
+    
+    account.password_hash = hash_password(request.new_password)
+    db.commit()
+    
+    # Clean up OTP
+    del _password_reset_otps[request.phone]
+    
+    return {"message": "Password reset successfully. You can now log in with your new password."}

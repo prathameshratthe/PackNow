@@ -14,6 +14,7 @@ import PackerLogin from './pages/PackerLogin';
 import PackerDashboard from './pages/PackerDashboard';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
+import ForgotPassword from './pages/ForgotPassword';
 import { isAuthenticated } from './utils/auth';
 
 // ═══════════════════════════════════════════════════════════
@@ -65,6 +66,7 @@ function AppContent() {
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
 
                 {/* ── CUSTOMER (role: user) ── */}
                 <Route path="/dashboard" element={<CustomerRoute><Dashboard /></CustomerRoute>} />

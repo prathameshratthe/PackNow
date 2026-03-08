@@ -173,9 +173,9 @@ export default function Login() {
                                 />
                                 <span className="text-gray-700">Remember me</span>
                             </label>
-                            <a href="#" className="text-primary-600 hover:text-primary-700 font-medium">
+                            <Link to="/forgot-password" className="text-primary-600 hover:text-primary-700 font-medium">
                                 Forgot password?
-                            </a>
+                            </Link>
                         </div>
 
                         {/* Submit Button */}
