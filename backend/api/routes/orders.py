@@ -121,7 +121,7 @@ def create_order(
     price_breakdown = PricingEngine.calculate_price(
         category=order_data.category,
         materials=materials,
-        distance_km=0,  # Will be updated
+        distance_km=order_data.distance_km,  # Initial estimate distance
         urgency=order_data.urgency
     )
     
@@ -138,6 +138,7 @@ def create_order(
         urgency=order_data.urgency,
         materials_required=materials,
         price=price_breakdown["final_price"],
+        distance_km=order_data.distance_km,  # Store the actual delivery distance calculated by frontend
         pickup_location=order_data.pickup_location.dict(),
         dropoff_location=order_data.dropoff_location.dict() if order_data.dropoff_location else None,
         receiver_name=order_data.receiver_name,

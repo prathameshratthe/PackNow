@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { geocodeAddress, calculateDistance } from '../utils/geocoding';
 
 const categories = [
     { value: 'gift', label: 'Gift Wrapping', icon: '🎁' },
@@ -24,11 +25,11 @@ export default function CreateOrder() {
         fragility_level: 'low',
         urgency: 'normal',
         address: '',
-        lat: 19.0760,
-        lng: 72.8777,
+        lat: null,
+        lng: null,
         dropoff_address: '',
-        dropoff_lat: 19.0820,
-        dropoff_lng: 72.8810,
+        dropoff_lat: null,
+        dropoff_lng: null,
         receiver_name: '',
         receiver_phone: '',
     });
@@ -42,6 +43,33 @@ export default function CreateOrder() {
         setError('');
 
         try {
+            // Geocode Pickup and Dropoff Addresses
+            const pickupCoords = await geocodeAddress(formData.address);
+            if (!pickupCoords) {
+                throw new Error("Could not find Pickup address. Please be more specific.");
+            }
+
+            const dropoffCoords = await geocodeAddress(formData.dropoff_address);
+            if (!dropoffCoords) {
+                throw new Error("Could not find Dropoff address. Please be more specific.");
+            }
+
+            // Calculate exact straight-line distance in km (must be at least 1km to avoid 0 cost)
+            let calculatedDistance = calculateDistance(
+                pickupCoords.lat, pickupCoords.lng,
+                dropoffCoords.lat, dropoffCoords.lng
+            );
+            calculatedDistance = Math.max(1.0, calculatedDistance); // Minimum 1km distance charge
+
+            // Save actual coordinates back to formData so handleSubmit can use them
+            setFormData(prev => ({
+                ...prev,
+                lat: pickupCoords.lat,
+                lng: pickupCoords.lng,
+                dropoff_lat: dropoffCoords.lat,
+                dropoff_lng: dropoffCoords.lng
+            }));
+
             const estimateData = {
                 category: formData.category,
                 item_dimensions: {
@@ -52,7 +80,7 @@ export default function CreateOrder() {
                 },
                 fragility_level: formData.fragility_level,
                 urgency: formData.urgency,
-                distance_km: 5,
+                distance_km: calculatedDistance, // <--- True Dynamic Distance Calculation!
             };
 
             const [materialRes, priceRes] = await Promise.all([
@@ -66,7 +94,7 @@ export default function CreateOrder() {
             });
             setStep(2);
         } catch (err) {
-            setError(err.response?.data?.detail || 'Failed to get estimate');
+            setError(err.message || err.response?.data?.detail || 'Failed to get estimate');
         } finally {
             setLoading(false);
         }

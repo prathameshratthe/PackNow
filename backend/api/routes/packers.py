@@ -164,22 +164,34 @@ def accept_order(
             detail="You do not have sufficient inventory to accept this order"
         )
         
-    # Calculate distance
-    distance = Dispatcher.haversine_distance(
+    # Calculate true delivery distance (Pickup to Dropoff) for pricing
+    if order.dropoff_location and "lat" in order.dropoff_location and "lng" in order.dropoff_location:
+        delivery_distance = Dispatcher.haversine_distance(
+            order.pickup_location["lat"], order.pickup_location["lng"],
+            order.dropoff_location["lat"], order.dropoff_location["lng"]
+        )
+        delivery_distance = max(1.0, delivery_distance) # Minimum 1km charge
+    else:
+        delivery_distance = 5.0 # Fallback if dropoff missing
+        
+    # Set the order distance to the delivery distance
+    order.distance_km = delivery_distance
+    
+    # Calculate dispatch distance (Packer to Pickup) just for the tracking event notification
+    dispatch_distance = Dispatcher.haversine_distance(
         float(current_packer.lat), float(current_packer.lng), 
         order.pickup_location["lat"], order.pickup_location["lng"]
     )
     
-    # Update order with packer and distance
+    # Update order with packer
     order.packer_id = current_packer.id
-    order.distance_km = distance
     order.status = OrderStatus.PACKER_ASSIGNED
     
-    # Recalculate price with actual distance
+    # Recalculate price with actual delivery distance
     price_breakdown = PricingEngine.calculate_price(
         category=order.category,
         materials=order.materials_required,
-        distance_km=distance,
+        distance_km=delivery_distance,
         urgency=order.urgency
     )
     order.price = price_breakdown["final_price"]
@@ -192,7 +204,7 @@ def accept_order(
     tracking_event = TrackingEvent(
         order_id=order.id,
         status=OrderStatus.PACKER_ASSIGNED,
-        message=f"Packer {current_packer.name} has accepted your order and is {distance} km away.",
+        message=f"Packer {current_packer.name} has accepted your order and is {dispatch_distance} km away.",
         packer_lat=current_packer.lat,
         packer_lng=current_packer.lng
     )
