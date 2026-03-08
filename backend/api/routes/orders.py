@@ -24,7 +24,7 @@ from services.material_estimator import MaterialEstimator
 from services.pricing_engine import PricingEngine
 from services.dispatcher import Dispatcher
 from services.inventory import InventoryManager
-from services.sms import otp_service
+from services.email import email_service
 from core.constants import OrderStatus
 
 
@@ -158,10 +158,24 @@ def create_order(
     db.add(tracking_event)
     db.commit()
     
-    # Send SMS Confirmation
-    if new_order.receiver_phone:
-        sms_msg = f"Hi {new_order.receiver_name}, an order (ID: #{new_order.id}) has been placed for you on PackNow! We are currently looking for a nearby packer."
-        otp_service.notify(new_order.receiver_phone, sms_msg)
+    # Send Email Confirmation
+    if current_user.email:
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px;">
+                <h2 style="color: #1a56db; margin-bottom: 20px;">PackNow Order Placed</h2>
+                <p style="color: #4b5563;">Hello {current_user.name},</p>
+                <p style="color: #4b5563;">Your packaging order <strong>#{new_order.id}</strong> has been placed successfully!</p>
+                <p style="color: #4b5563;">We are currently looking for a nearby professional packer to accept your request.</p>
+                <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">Thank you for using PackNow.</p>
+            </div>
+        </div>
+        """
+        email_service.send_email(
+            to_email=current_user.email,
+            subject=f"PackNow Order Confirmation #{new_order.id}",
+            html_content=html_content
+        )
     
     # Gig Working Model: Orders wait in the pool to be accepted manually by a packer.
     # background_tasks.add_task(dispatch_packer, new_order.id, db)
@@ -339,10 +353,27 @@ def update_order_status(
     db.commit()
     db.refresh(order)
     
-    # SMS Trigger for Delivery OTP when packer is on the way
-    if status_update.status == OrderStatus.ON_THE_WAY and order.receiver_phone:
-        sms_msg = f"PackNow Alert: Your packer {packer.name if packer else ''} is on the way with your package! Your Delivery OTP is: {order.delivery_otp}. Please share this with the packer at dropoff to complete the delivery."
-        otp_service.notify(order.receiver_phone, sms_msg)
+    # Email Trigger for Delivery OTP when packer is on the way
+    if status_update.status == OrderStatus.ON_THE_WAY and order.user.email:
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; text-align: center;">
+                <h2 style="color: #1a56db;">PackNow Delivery Update</h2>
+                <p style="color: #4b5563; text-align: left;">Hello {order.user.name},</p>
+                <p style="color: #4b5563; text-align: left;">Your packer <strong>{packer.name if packer else ''}</strong> is on the way with your package!</p>
+                <p style="color: #4b5563; text-align: left;">Your Delivery OTP is:</p>
+                <div style="margin: 20px 0; padding: 15px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+                    <p style="font-size: 28px; font-weight: bold; font-family: monospace; letter-spacing: 5px; color: #15803d; margin: 0;">{order.delivery_otp}</p>
+                </div>
+                <p style="color: #6b7280; font-size: 14px; text-align: left;">Please share this code with the packer at dropoff to complete the delivery.</p>
+            </div>
+        </div>
+        """
+        email_service.send_email(
+            to_email=order.user.email,
+            subject="PackNow: Your package is on the way!",
+            html_content=html_content
+        )
     
     return order
 

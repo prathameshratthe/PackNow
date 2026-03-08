@@ -319,7 +319,7 @@ import string
 import time
 
 from pydantic import BaseModel
-from services.sms import otp_service
+from services.email import email_service
 
 # In-memory OTP store: { phone: { "otp": "123456", "expires": timestamp } }
 _password_reset_otps = {}
@@ -356,6 +356,12 @@ def request_password_reset_otp(request: ForgotPasswordRequest, db: Session = Dep
     if not account:
         # Don't reveal whether the phone exists — always return success
         return {"message": "If this phone number is registered, you will receive an OTP."}
+        
+    if not account.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No email address is associated with this account. Cannot send password reset link."
+        )
     
     # Generate 6-digit OTP
     otp = ''.join(random.choices(string.digits, k=6))
@@ -368,10 +374,27 @@ def request_password_reset_otp(request: ForgotPasswordRequest, db: Session = Dep
         "verified": False
     }
     
-    # Log the OTP (server-side audit trail)
-    otp_service.notify(request.phone, f"Password Reset OTP: {otp}")
+    # Send Email OTP
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+        <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;">
+            <h2 style="color: #1a56db; margin-bottom: 20px;">PackNow Password Reset</h2>
+            <p style="color: #4b5563; text-align: left; line-height: 1.6;">Hello {account.name},</p>
+            <p style="color: #4b5563; text-align: left; line-height: 1.6;">You requested a password reset for your PackNow account. Use the following OTP to proceed:</p>
+            <div style="margin: 30px 0; padding: 20px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+                <p style="font-size: 32px; font-weight: bold; font-family: monospace; letter-spacing: 8px; color: #15803d; margin: 0;">{otp}</p>
+            </div>
+            <p style="color: #6b7280; font-size: 14px; text-align: left;">This OTP is valid for <strong>5 minutes</strong>. If you did not request this reset, please ignore this email.</p>
+        </div>
+    </div>
+    """
+    email_service.send_email(
+        to_email=account.email,
+        subject="Your PackNow Password Reset OTP",
+        html_content=html_content
+    )
     
-    return {"message": "OTP generated successfully.", "otp": otp}
+    return {"message": "If this phone number is registered and has an email, you will receive an OTP."}
 
 
 @router.post("/forgot-password/verify-otp")

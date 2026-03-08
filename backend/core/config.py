@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Admin Security
     ADMIN_SECRET_KEY: str = "packnow-admin-2026"  # Required as second factor for admin login
     
+    # Email Service
+    RESEND_API_KEY: Optional[str] = None
+    
     # Application
     APP_NAME: str = "PackNow"
     APP_VERSION: str = "1.0.0"

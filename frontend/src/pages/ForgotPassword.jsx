@@ -23,12 +23,8 @@ export default function ForgotPassword() {
         if (!phone) { toast.error('Please enter your phone number'); return; }
         setLoading(true);
         try {
-            const response = await api.post('/auth/forgot-password/request-otp', { phone, role });
-            const generatedOtp = response.data.otp;
-            if (generatedOtp) {
-                setOtp(generatedOtp); // Auto-fill the OTP
-            }
-            toast.success('OTP generated successfully!');
+            await api.post('/auth/forgot-password/request-otp', { phone, role });
+            toast.success('OTP sent to your registered email address!');
             setStep(2);
         } catch (err) {
             toast.error(err.response?.data?.detail || 'Failed to generate OTP. Check your phone number.');
@@ -142,14 +138,8 @@ export default function ForgotPassword() {
                                     autoFocus
                                 />
                                 <p className="mt-2 text-xs text-gray-500 text-center">
-                                    Your OTP has been auto-filled below. Expires in 5 minutes.
+                                    Please check your registered email inbox for the OTP. Expires in 5 minutes.
                                 </p>
-                                {otp && (
-                                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-center">
-                                        <p className="text-xs text-green-600 font-medium">Your OTP Code</p>
-                                        <p className="text-2xl font-bold text-green-700 tracking-[0.3em] font-mono">{otp}</p>
-                                    </div>
-                                )}
                             </div>
                             <button type="submit" disabled={loading || otp.length !== 6} className="w-full btn btn-primary py-3 text-lg font-semibold">
                                 {loading ? (
