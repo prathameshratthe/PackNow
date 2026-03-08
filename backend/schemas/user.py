@@ -38,3 +38,11 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+
+
+class AdminLogin(BaseModel):
+    """Schema for admin login with secret key (second factor)."""
+    email: str
+    password: str
+    admin_key: str  # Required secret key for admin authentication
+

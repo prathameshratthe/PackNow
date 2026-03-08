@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from models.database import get_db
 from models.user import User
 from models.packer import Packer
-from schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse
+from schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse, AdminLogin
 from schemas.packer import PackerCreate, PackerResponse
 from core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from core.constants import UserRole
@@ -215,28 +215,38 @@ def login_packer(login_data: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.post("/login/admin", response_model=TokenResponse)
-def login_admin(login_data: UserLogin, db: Session = Depends(get_db)):
+def login_admin(login_data: AdminLogin, db: Session = Depends(get_db)):
     """
-    Login admin and return JWT tokens.
+    Login admin with email + password + admin secret key (two-factor).
     
     Args:
-        login_data: Login credentials (phone field used as email for admin)
+        login_data: Admin login credentials with secret key
         db: Database session
         
     Returns:
         Access and refresh tokens
         
     Raises:
-        HTTPException: If credentials are invalid
+        HTTPException: If credentials are invalid or admin key is wrong
     """
     from models.admin import Admin
+    from schemas.user import AdminLogin as AdminLoginSchema
+    from core.config import settings
+    import hmac
     
-    admin = db.query(Admin).filter(Admin.email == login_data.phone).first()
+    # Validate admin secret key FIRST (prevents timing attacks)
+    if not hmac.compare_digest(login_data.admin_key, settings.ADMIN_SECRET_KEY):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"  # Generic message — don't reveal which field failed
+        )
+    
+    admin = db.query(Admin).filter(Admin.email == login_data.email).first()
     
     if not admin or not verify_password(login_data.password, admin.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
+            detail="Invalid credentials"
         )
     
     # Create tokens
